@@ -52,6 +52,8 @@ TIM_HandleTypeDef htim15;
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
+int count_1 = 0;
+int count_2 = 0;
 
 /* USER CODE END PV */
 
@@ -75,8 +77,21 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
   if (htim == &htim15)
   {
-    printf("Hello World!!\r\n");
-    HAL_GPIO_TogglePin(LD3_GPIO_Port, LD3_Pin);
+    // HAL_GPIO_WritePin(RIGHT_MOTOR_PAHSE_GPIO_Port, RIGHT_MOTOR_PAHSE_Pin, GPIO_PIN_RESET);
+    __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, count_2);
+    // __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, 900);
+    HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
+     count_2++;
+     if (count_2 > 1000)
+     {
+       count_2 = 0;
+     }
+    count_1++;
+    if (count_1 > 3000)
+    {
+      count_1 = 0;
+      HAL_GPIO_TogglePin(RIGHT_MOTOR_PAHSE_GPIO_Port, RIGHT_MOTOR_PAHSE_Pin);
+    }
   }
 }
 
@@ -128,11 +143,11 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-    // printf("Hello World!!\r\n");
-    // HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_SET);
-    // HAL_Delay(3000);
-    // HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_RESET);
-    // HAL_Delay(3000);
+     printf("Hello World!!\r\n");
+     HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_SET);
+     HAL_Delay(3000);
+     HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_RESET);
+     HAL_Delay(3000);
   }
   /* USER CODE END 3 */
 }
@@ -454,7 +469,7 @@ static void MX_TIM15_Init(void)
 
   /* USER CODE END TIM15_Init 1 */
   htim15.Instance = TIM15;
-  htim15.Init.Prescaler = 8000-1;
+  htim15.Init.Prescaler = 8-1;
   htim15.Init.CounterMode = TIM_COUNTERMODE_UP;
   htim15.Init.Period = 1000-1;
   htim15.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
