@@ -23,6 +23,8 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -54,6 +56,8 @@ UART_HandleTypeDef huart2;
 /* USER CODE BEGIN PV */
 uint16_t motor_count = 0;
 uint16_t encoder_count = 0;
+uint8_t receive_buffer[24];
+float cmd_vel[3];
 
 /* USER CODE END PV */
 
@@ -90,14 +94,14 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
     if (encoder_count > 200)
     {
       encoder_count = 0;
-      int16_t encoder_value= read_encoder_value();
-      printf("enc_buff: %d\r\n", encoder_value);
-      printf("out(deg/s): %f\r\n", (float)encoder_value * 1.20321);
+      int16_t encoder_value = read_encoder_value();
+      // printf("enc_buff: %d\r\n", encoder_value);
+      // printf("out(deg/s): %f\r\n", (float)encoder_value * 1.20321);
     }
 
     // motor
-    __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, 420);
-    HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
+    // __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, 420);
+    // HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
 
     // __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, motor_count);
     // HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
@@ -107,7 +111,43 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
     //   motor_count = 0;
     //   HAL_GPIO_TogglePin(RIGHT_MOTOR_PAHSE_GPIO_Port, RIGHT_MOTOR_PAHSE_Pin);
     // }
+
+    float output_raw = cmd_vel[0] * 5000.0;
+    int16_t output = (int)output_raw;
+    if (output > 0)
+    {
+      HAL_GPIO_WritePin(RIGHT_MOTOR_PAHSE_GPIO_Port, RIGHT_MOTOR_PAHSE_Pin, GPIO_PIN_SET);
+    }
+    else
+    {
+      output *= -1;
+      HAL_GPIO_WritePin(RIGHT_MOTOR_PAHSE_GPIO_Port, RIGHT_MOTOR_PAHSE_Pin, GPIO_PIN_RESET);
+
+    }
+    __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, output);
+    HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
+
+    motor_count++;
+    if (motor_count > 1000)
+    {
+      motor_count = 0;
+      // printf("output: %d\r\n", output);
+    }
   }
+}
+
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+{
+  char *tmp;
+  tmp = strtok(receive_buffer, ",");
+  cmd_vel[0] = atof(tmp);
+  for (int i = 1; i < 3; i++)
+  {
+    tmp = strtok(NULL, ",");
+    cmd_vel[i] = atof(tmp);
+  }
+  // printf("---\r\n");
+  HAL_UART_Receive_IT(&huart2, receive_buffer, 24);
 }
 
 /* USER CODE END 0 */
@@ -149,6 +189,7 @@ int main(void)
   MX_I2C1_Init();
   /* USER CODE BEGIN 2 */
   HAL_TIM_Base_Start_IT(&htim15);
+  HAL_UART_Receive_IT(&huart2, receive_buffer, 24);
   HAL_TIM_Encoder_Start(&htim2, TIM_CHANNEL_ALL);
   HAL_TIM_Encoder_Start(&htim3, TIM_CHANNEL_ALL);
   /* USER CODE END 2 */
@@ -160,10 +201,14 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-    HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_SET);
-    HAL_Delay(3000);
-    HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_RESET);
-    HAL_Delay(3000);
+    // HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_SET);
+    // HAL_Delay(3000);
+    // HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_RESET);
+    // HAL_Delay(3000);
+
+    // serial read
+    HAL_UART_Receive_IT(&huart2, receive_buffer, 24);
+    HAL_Delay(40);
   }
   /* USER CODE END 3 */
 }
@@ -528,7 +573,7 @@ static void MX_USART2_UART_Init(void)
 
   /* USER CODE END USART2_Init 1 */
   huart2.Instance = USART2;
-  huart2.Init.BaudRate = 38400;
+  huart2.Init.BaudRate = 115200;
   huart2.Init.WordLength = UART_WORDLENGTH_8B;
   huart2.Init.StopBits = UART_STOPBITS_1;
   huart2.Init.Parity = UART_PARITY_NONE;
@@ -576,7 +621,7 @@ static void MX_GPIO_Init(void)
 /* USER CODE BEGIN 4 */
 int _write(int file, char *ptr, int len)
 {
-  HAL_UART_Transmit(&huart2,(uint8_t *)ptr,len,10);
+  HAL_UART_Transmit(&huart2, (uint8_t *)ptr, len, 10);
   return len;
 }
 /* USER CODE END 4 */
