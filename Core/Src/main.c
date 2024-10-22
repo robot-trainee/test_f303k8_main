@@ -56,8 +56,8 @@ UART_HandleTypeDef huart2;
 /* USER CODE BEGIN PV */
 uint16_t motor_count = 0;
 uint16_t encoder_count = 0;
-uint8_t receive_buffer[24];
-float cmd_vel[3];
+uint8_t receive_buffer[8];
+float cmd_vel[6];
 
 /* USER CODE END PV */
 
@@ -112,7 +112,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
     //   HAL_GPIO_TogglePin(RIGHT_MOTOR_PAHSE_GPIO_Port, RIGHT_MOTOR_PAHSE_Pin);
     // }
 
-    float output_raw = cmd_vel[0] * 5000.0;
+    float output_raw = cmd_vel[0] * 4999.0;
     int16_t output = (int)output_raw;
     if (output > 0)
     {
@@ -131,23 +131,32 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
     if (motor_count > 1000)
     {
       motor_count = 0;
-      // printf("output: %d\r\n", output);
+      printf("output: %d\r\n", output);
     }
   }
 }
 
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
-  char *tmp;
-  tmp = strtok(receive_buffer, ",");
-  cmd_vel[0] = atof(tmp);
-  for (int i = 1; i < 3; i++)
+  if (receive_buffer[0] == 0xFF && receive_buffer[6] == 0xFF)
   {
-    tmp = strtok(NULL, ",");
-    cmd_vel[i] = atof(tmp);
+    int idx = (int)receive_buffer[1];
+    union {
+        float f;
+        int32_t ui;
+    } data;
+    data.ui = (int32_t) (
+          (((int32_t)receive_buffer[2] << 24) & 0xFF000000)
+        | (((int32_t)receive_buffer[3] << 16) & 0x00FF0000)
+        | (((int32_t)receive_buffer[4] <<  8) & 0x0000FF00)
+        | (((int32_t)receive_buffer[5] <<  0) & 0x000000FF)
+    );
+    cmd_vel[idx] = 0.0;
+    cmd_vel[idx] = data.f;
   }
-  // printf("---\r\n");
-  HAL_UART_Receive_IT(&huart2, receive_buffer, 24);
+
+  HAL_UART_Receive_IT(&huart2, receive_buffer, 8);
+  HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_SET);
 }
 
 /* USER CODE END 0 */
@@ -189,7 +198,7 @@ int main(void)
   MX_I2C1_Init();
   /* USER CODE BEGIN 2 */
   HAL_TIM_Base_Start_IT(&htim15);
-  HAL_UART_Receive_IT(&huart2, receive_buffer, 24);
+  HAL_UART_Receive_IT(&huart2, receive_buffer, 8);
   HAL_TIM_Encoder_Start(&htim2, TIM_CHANNEL_ALL);
   HAL_TIM_Encoder_Start(&htim3, TIM_CHANNEL_ALL);
   /* USER CODE END 2 */
@@ -202,13 +211,13 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
     // HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_SET);
-    // HAL_Delay(3000);
-    // HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_RESET);
-    // HAL_Delay(3000);
+    // HAL_Delay(1000);
+    HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_RESET);
+    // HAL_Delay(1000);
 
     // serial read
-    HAL_UART_Receive_IT(&huart2, receive_buffer, 24);
-    HAL_Delay(40);
+    HAL_UART_Receive_IT(&huart2, receive_buffer, 8);
+    HAL_Delay(50);
   }
   /* USER CODE END 3 */
 }
