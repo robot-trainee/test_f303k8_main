@@ -58,6 +58,7 @@ uint16_t motor_count = 0;
 uint16_t encoder_count = 0;
 uint8_t receive_buffer[8];
 float cmd_vel[6];
+uint8_t can_count = 0;
 
 /* USER CODE END PV */
 
@@ -201,6 +202,8 @@ int main(void)
   HAL_UART_Receive_IT(&huart2, receive_buffer, 8);
   HAL_TIM_Encoder_Start(&htim2, TIM_CHANNEL_ALL);
   HAL_TIM_Encoder_Start(&htim3, TIM_CHANNEL_ALL);
+  HAL_CAN_Start(&hcan);
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -212,12 +215,48 @@ int main(void)
     /* USER CODE BEGIN 3 */
     // HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_SET);
     // HAL_Delay(1000);
-    HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_RESET);
+    // HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_RESET);
     // HAL_Delay(1000);
+    HAL_GPIO_TogglePin(LD3_GPIO_Port, LD3_Pin);
 
     // serial read
     HAL_UART_Receive_IT(&huart2, receive_buffer, 8);
     HAL_Delay(50);
+
+    // can transmit
+    CAN_TxHeaderTypeDef TxHeader;
+    uint32_t TxMailbox;
+    uint8_t TxData[8];
+    if (0 < HAL_CAN_GetTxMailboxesFreeLevel(&hcan))
+    {
+      TxHeader.StdId = 0x711;
+      TxHeader.RTR = CAN_RTR_DATA;
+      TxHeader.IDE = CAN_ID_STD;
+      TxHeader.DLC = 8;
+      TxHeader.TransmitGlobalTime = DISABLE;
+      TxData[0] = can_count + 0;
+      TxData[1] = can_count + 1;
+      TxData[2] = can_count + 2;
+      TxData[3] = can_count + 3;
+      TxData[4] = can_count + 4;
+      TxData[5] = can_count + 5;
+      TxData[6] = can_count + 6;
+      TxData[7] = can_count + 7;
+      if (HAL_CAN_AddTxMessage(&hcan, &TxHeader, TxData, &TxMailbox) != HAL_OK)
+      {
+        Error_Handler();
+      }
+    }
+    HAL_Delay(100);
+
+	  if (can_count > 240)
+    {
+		   can_count = 0;
+	  }
+	  else
+    {
+		  can_count++;
+	  }
   }
   /* USER CODE END 3 */
 }
@@ -281,11 +320,11 @@ static void MX_CAN_Init(void)
 
   /* USER CODE END CAN_Init 1 */
   hcan.Instance = CAN;
-  hcan.Init.Prescaler = 16;
+  hcan.Init.Prescaler = 2;
   hcan.Init.Mode = CAN_MODE_NORMAL;
   hcan.Init.SyncJumpWidth = CAN_SJW_1TQ;
-  hcan.Init.TimeSeg1 = CAN_BS1_1TQ;
-  hcan.Init.TimeSeg2 = CAN_BS2_1TQ;
+  hcan.Init.TimeSeg1 = CAN_BS1_7TQ;
+  hcan.Init.TimeSeg2 = CAN_BS2_2TQ;
   hcan.Init.TimeTriggeredMode = DISABLE;
   hcan.Init.AutoBusOff = DISABLE;
   hcan.Init.AutoWakeUp = DISABLE;
