@@ -57,7 +57,7 @@ UART_HandleTypeDef huart2;
 uint16_t motor_count = 0;
 uint16_t encoder_count = 0;
 uint8_t receive_buffer[8];
-float cmd_vel[6];
+float cmd_vel[6]; // right_front, left_front, right_back, left_back, yaw, pitch
 uint8_t can_count = 0;
 
 /* USER CODE END PV */
@@ -90,9 +90,9 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
   if (htim == &htim15)
   {
-    // encoder
+    // ---encoder
     encoder_count++;
-    if (encoder_count > 200)
+    if (encoder_count > 200) // 5Hz
     {
       encoder_count = 0;
       int16_t encoder_value = read_encoder_value();
@@ -100,39 +100,86 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
       // printf("out(deg/s): %f\r\n", (float)encoder_value * 1.20321);
     }
 
-    // motor
-    // __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, 420);
-    // HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
-
-    // __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, motor_count);
-    // HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
-    // motor_count++;
-    // if (motor_count > 1000)
-    // {
-    //   motor_count = 0;
-    //   HAL_GPIO_TogglePin(RIGHT_MOTOR_PAHSE_GPIO_Port, RIGHT_MOTOR_PAHSE_Pin);
-    // }
-
-    float output_raw = cmd_vel[0] * 4999.0;
-    int16_t output = (int)output_raw;
-    if (output > 0)
-    {
-      HAL_GPIO_WritePin(RIGHT_MOTOR_PAHSE_GPIO_Port, RIGHT_MOTOR_PAHSE_Pin, GPIO_PIN_SET);
-    }
-    else
-    {
-      output *= -1;
-      HAL_GPIO_WritePin(RIGHT_MOTOR_PAHSE_GPIO_Port, RIGHT_MOTOR_PAHSE_Pin, GPIO_PIN_RESET);
-
-    }
-    __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, output);
-    HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
-
+    // ---motor
     motor_count++;
-    if (motor_count > 1000)
+    if (motor_count > 50) // 20Hz
     {
+      float output_raw = cmd_vel[0] * 50.0;
+      int16_t output = (int)output_raw;
+      if (output > 0)
+      {
+        HAL_GPIO_WritePin(RIGHT_MOTOR_PAHSE_GPIO_Port, RIGHT_MOTOR_PAHSE_Pin, GPIO_PIN_SET);
+      }
+      else
+      {
+        output *= -1;
+        HAL_GPIO_WritePin(RIGHT_MOTOR_PAHSE_GPIO_Port, RIGHT_MOTOR_PAHSE_Pin, GPIO_PIN_RESET);
+      }
+      __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, output);
+      HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
+
       motor_count = 0;
       printf("output: %d\r\n", output);
+    }
+
+    // ---can transmit
+    can_count++;
+    if (can_count > 25) // 40Hz
+    {
+      CAN_TxHeaderTypeDef TxHeader;
+      uint32_t TxMailbox;
+      uint8_t TxData[8];
+      union {
+          float f;
+          int32_t ui;
+      } data;
+      // right_back & left_back
+      if (0 < HAL_CAN_GetTxMailboxesFreeLevel(&hcan))
+      {
+        TxHeader.StdId = 0x711;
+        TxHeader.RTR = CAN_RTR_DATA;
+        TxHeader.IDE = CAN_ID_STD;
+        TxHeader.DLC = 8;
+        TxHeader.TransmitGlobalTime = DISABLE;
+        data.f = cmd_vel[2];
+        TxData[0] = (uint8_t) ((data.ui & 0xFF000000) >> 24);
+        TxData[1] = (uint8_t) ((data.ui & 0x00FF0000) >> 16);
+        TxData[2] = (uint8_t) ((data.ui & 0x0000FF00) >>  8);
+        TxData[3] = (uint8_t) ((data.ui & 0x000000FF) >>  0);
+        data.f = cmd_vel[3];
+        TxData[4] = (uint8_t) ((data.ui & 0xFF000000) >> 24);
+        TxData[5] = (uint8_t) ((data.ui & 0x00FF0000) >> 16);
+        TxData[6] = (uint8_t) ((data.ui & 0x0000FF00) >>  8);
+        TxData[7] = (uint8_t) ((data.ui & 0x000000FF) >>  0);
+        if (HAL_CAN_AddTxMessage(&hcan, &TxHeader, TxData, &TxMailbox) != HAL_OK)
+        {
+          Error_Handler();
+        }
+      }
+      // yaw & pitch
+      // if (0 < HAL_CAN_GetTxMailboxesFreeLevel(&hcan))
+      // {
+      //   TxHeader.StdId = 0x712;
+      //   TxHeader.RTR = CAN_RTR_DATA;
+      //   TxHeader.IDE = CAN_ID_STD;
+      //   TxHeader.DLC = 8;
+      //   TxHeader.TransmitGlobalTime = DISABLE;
+      //   data.f = cmd_vel[4];
+      //   TxData[0] = (uint8_t) ((data.ui & 0xFF000000) >> 24);
+      //   TxData[1] = (uint8_t) ((data.ui & 0x00FF0000) >> 16);
+      //   TxData[2] = (uint8_t) ((data.ui & 0x0000FF00) >>  8);
+      //   TxData[3] = (uint8_t) ((data.ui & 0x000000FF) >>  0);
+      //   data.f = cmd_vel[5];
+      //   TxData[4] = (uint8_t) ((data.ui & 0xFF000000) >> 24);
+      //   TxData[5] = (uint8_t) ((data.ui & 0x00FF0000) >> 16);
+      //   TxData[6] = (uint8_t) ((data.ui & 0x0000FF00) >>  8);
+      //   TxData[7] = (uint8_t) ((data.ui & 0x000000FF) >>  0);
+      //   if (HAL_CAN_AddTxMessage(&hcan, &TxHeader, TxData, &TxMailbox) != HAL_OK)
+      //   {
+      //     Error_Handler();
+      //   }
+      // }
+      can_count = 0;
     }
   }
 }
@@ -152,7 +199,6 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
         | (((int32_t)receive_buffer[4] <<  8) & 0x0000FF00)
         | (((int32_t)receive_buffer[5] <<  0) & 0x000000FF)
     );
-    cmd_vel[idx] = 0.0;
     cmd_vel[idx] = data.f;
   }
 
@@ -222,41 +268,6 @@ int main(void)
     // serial read
     HAL_UART_Receive_IT(&huart2, receive_buffer, 8);
     HAL_Delay(50);
-
-    // can transmit
-    CAN_TxHeaderTypeDef TxHeader;
-    uint32_t TxMailbox;
-    uint8_t TxData[8];
-    if (0 < HAL_CAN_GetTxMailboxesFreeLevel(&hcan))
-    {
-      TxHeader.StdId = 0x711;
-      TxHeader.RTR = CAN_RTR_DATA;
-      TxHeader.IDE = CAN_ID_STD;
-      TxHeader.DLC = 8;
-      TxHeader.TransmitGlobalTime = DISABLE;
-      TxData[0] = can_count + 0;
-      TxData[1] = can_count + 1;
-      TxData[2] = can_count + 2;
-      TxData[3] = can_count + 3;
-      TxData[4] = can_count + 4;
-      TxData[5] = can_count + 5;
-      TxData[6] = can_count + 6;
-      TxData[7] = can_count + 7;
-      if (HAL_CAN_AddTxMessage(&hcan, &TxHeader, TxData, &TxMailbox) != HAL_OK)
-      {
-        Error_Handler();
-      }
-    }
-    HAL_Delay(100);
-
-	  if (can_count > 240)
-    {
-		   can_count = 0;
-	  }
-	  else
-    {
-		  can_count++;
-	  }
   }
   /* USER CODE END 3 */
 }
