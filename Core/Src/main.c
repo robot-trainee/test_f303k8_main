@@ -157,28 +157,28 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
         }
       }
       // yaw & pitch
-      // if (0 < HAL_CAN_GetTxMailboxesFreeLevel(&hcan))
-      // {
-      //   TxHeader.StdId = 0x712;
-      //   TxHeader.RTR = CAN_RTR_DATA;
-      //   TxHeader.IDE = CAN_ID_STD;
-      //   TxHeader.DLC = 8;
-      //   TxHeader.TransmitGlobalTime = DISABLE;
-      //   data.f = cmd_vel[4];
-      //   TxData[0] = (uint8_t) ((data.ui & 0xFF000000) >> 24);
-      //   TxData[1] = (uint8_t) ((data.ui & 0x00FF0000) >> 16);
-      //   TxData[2] = (uint8_t) ((data.ui & 0x0000FF00) >>  8);
-      //   TxData[3] = (uint8_t) ((data.ui & 0x000000FF) >>  0);
-      //   data.f = cmd_vel[5];
-      //   TxData[4] = (uint8_t) ((data.ui & 0xFF000000) >> 24);
-      //   TxData[5] = (uint8_t) ((data.ui & 0x00FF0000) >> 16);
-      //   TxData[6] = (uint8_t) ((data.ui & 0x0000FF00) >>  8);
-      //   TxData[7] = (uint8_t) ((data.ui & 0x000000FF) >>  0);
-      //   if (HAL_CAN_AddTxMessage(&hcan, &TxHeader, TxData, &TxMailbox) != HAL_OK)
-      //   {
-      //     Error_Handler();
-      //   }
-      // }
+      if (0 < HAL_CAN_GetTxMailboxesFreeLevel(&hcan))
+      {
+        TxHeader.StdId = 0x712;
+        TxHeader.RTR = CAN_RTR_DATA;
+        TxHeader.IDE = CAN_ID_STD;
+        TxHeader.DLC = 8;
+        TxHeader.TransmitGlobalTime = DISABLE;
+        data.f = cmd_vel[4];
+        TxData[0] = (uint8_t) ((data.ui & 0xFF000000) >> 24);
+        TxData[1] = (uint8_t) ((data.ui & 0x00FF0000) >> 16);
+        TxData[2] = (uint8_t) ((data.ui & 0x0000FF00) >>  8);
+        TxData[3] = (uint8_t) ((data.ui & 0x000000FF) >>  0);
+        data.f = cmd_vel[5];
+        TxData[4] = (uint8_t) ((data.ui & 0xFF000000) >> 24);
+        TxData[5] = (uint8_t) ((data.ui & 0x00FF0000) >> 16);
+        TxData[6] = (uint8_t) ((data.ui & 0x0000FF00) >>  8);
+        TxData[7] = (uint8_t) ((data.ui & 0x000000FF) >>  0);
+        if (HAL_CAN_AddTxMessage(&hcan, &TxHeader, TxData, &TxMailbox) != HAL_OK)
+        {
+          Error_Handler();
+        }
+      }
       can_count = 0;
     }
   }
